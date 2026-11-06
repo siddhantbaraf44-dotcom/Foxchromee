@@ -1,0 +1,50 @@
+name: Build APK
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Lets you upload just FoxChrome.zip (+ this yml) to the repo.
+      # If the project isn't unpacked yet, extract the zip into the repo root.
+      - name: Unpack source zip (if needed)
+        run: |
+          if [ ! -f settings.gradle.kts ]; then
+            Z=$(ls *.zip 2>/dev/null | head -1)
+            [ -n "$Z" ] || { echo "No settings.gradle.kts and no .zip found in repo root"; exit 1; }
+            mkdir -p /tmp/src && unzip -q "$Z" -d /tmp/src
+            SRC=$(dirname "$(find /tmp/src -name settings.gradle.kts | head -1)")
+            cp -a "$SRC"/. .
+          fi
+          ls -la
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.5
+
+      - name: Build debug APK
+        run: gradle assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: FoxChrome-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
